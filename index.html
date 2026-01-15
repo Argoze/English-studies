@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English & Code Hub</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+
+    <nav>
+        <button class="nav-btn active" onclick="switchView('journal', this)">Diário</button>
+        <button class="nav-btn" onclick="switchView('flashcards', this)">Perguntas</button>
+
+    </nav>
+
+    <main>
+        <!-- Journal View -->
+        <section id="journal" class="view-section active">
+            <div class="input-group">
+                <h3>o que foi aprendido hoje?</h3>
+                <input type="text" id="log-topic" placeholder="Topico">
+                <textarea id="log-content" rows="4" placeholder="Descrição"></textarea>
+                <button class="action-btn" onclick="addLog()">Salvar entrada</button>
+            </div>
+            <div id="entries-list">
+                <!-- Logs will appear here -->
+            </div>
+        </section>
+
+        <!-- Flashcards View -->
+        <section id="flashcards" class="view-section">
+            <div class="input-group">
+                <h3>Adicionar nova pergunta</h3>
+                <input type="text" id="card-front" placeholder="Pergunta">
+                <input type="text" id="card-back" placeholder="Resposta">
+                <button class="action-btn" onclick="addCard()">Adicionar Pergunta</button>
+            </div>
+
+            <div class="flashcard-container" onclick="flipCard()">
+                <div class="flashcard" id="active-card">
+                    <div class="card-front">
+                        <span class="card-label">Pergunta</span>
+                        <div class="card-content" id="card-front-text">Adicione uma pergunta!</div>
+                    </div>
+                    <div class="card-back">
+                        <span class="card-label">Resposta</span>
+                        <div class="card-content" id="card-back-text">Adicione uma resposta!</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="nav-btn" onclick="prevCard()">Anterior</button>
+                <button class="delete-btn" onclick="deleteCurrentCard()" title="Apagar Cartão">🗑️</button>
+                <button class="nav-btn" onclick="nextCard()">Proximo</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/script.js"></script>
+</body>
+
+</html>
