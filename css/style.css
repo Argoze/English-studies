@@ -164,6 +164,13 @@ button.action-btn:hover {
     margin-bottom: 0.5rem;
 }
 
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    margin-left: 1rem;
+}
+
 /* Flashcard Styles */
 .flashcard-container {
     perspective: 1000px;

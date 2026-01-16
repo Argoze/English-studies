@@ -165,7 +165,6 @@ function renderLogs() {
           <h3 style="color:var(--accent);margin-bottom:0.5rem;">${log.topic}</h3>
           ${log.tags ? `<div class="tags-container">${log.tags.split(',').map(t => `<span class="tag-chip">${t.trim()}</span>`).join('')}</div>` : ''}
         </div>
-        </div>
         <div class="action-buttons">
             <button class="edit-btn" onclick="editLog(${log.id})" title="Editar">✏️</button>
             <button class="delete-btn" onclick="deleteLog(${log.id})" title="Apagar">🗑️</button>
@@ -213,7 +212,10 @@ function renderCard(idx) {
 }
 window.renderCard = renderCard;
 
-function flipCard() { document.getElementById('active-card').classList.toggle('flipped'); }
+function flipCard() {
+    if (isEditingCard) return; // Disable flip when editing
+    document.getElementById('active-card').classList.toggle('flipped');
+}
 window.flipCard = flipCard;
 
 function nextCard() { if (cards.length === 0) return; currentCardIndex = (currentCardIndex + 1) % cards.length; renderCard(currentCardIndex); }
@@ -257,23 +259,21 @@ function toggleEditCard() {
     if (isEditingCard) {
         // Enter Edit Mode
         const card = cards[currentCardIndex];
-        const frontContainer = document.querySelector('.card-front');
-        const backContainer = document.querySelector('.card-back');
+        const activeCard = document.getElementById('active-card');
 
         // Disable navigation while editing
         navs.forEach(b => b.disabled = true);
         deleteBtn.style.display = 'none';
 
-        // Swap text for inputs
-        frontContainer.innerHTML = `<span class="card-label">Editar Pergunta</span>
-            <textarea id="edit-front-input" class="edit-card-input" placeholder="Pergunta">${card.front}</textarea>`;
-        backContainer.innerHTML = `<span class="card-label">Editar Resposta</span>
-            <textarea id="edit-back-input" class="edit-card-input" placeholder="Resposta">${card.back}</textarea>`;
+        // Force front side
+        activeCard.classList.remove('flipped');
 
-        // Disable flip animation temporarily or just ensure we can see both?
-        // Actually, inputs inside the 3D card might be tricky if flipped.
-        // Simplification: Auto-flip to front when editing starts.
-        document.getElementById('active-card').classList.remove('flipped');
+        const frontContainer = activeCard.querySelector('.card-front .card-content');
+        const backContainer = activeCard.querySelector('.card-back .card-content');
+
+        // Swap text for inputs with stopPropagation
+        frontContainer.innerHTML = `<textarea id="edit-front-input" class="edit-card-input" placeholder="Pergunta" onclick="event.stopPropagation()">${card.front}</textarea>`;
+        backContainer.innerHTML = `<textarea id="edit-back-input" class="edit-card-input" placeholder="Resposta" onclick="event.stopPropagation()">${card.back}</textarea>`;
 
         btn.textContent = '💾'; // Save icon
         btn.title = 'Salvar Alterações';
