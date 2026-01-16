@@ -301,10 +301,70 @@ button.action-btn:hover {
     color: #e2e8f0;
 }
 
-.log-content-body blockquote {
-    border-left: 3px solid var(--accent);
-    padding-left: 1rem;
-    margin-bottom: 1rem;
-    font-style: italic;
-    color: var(--text-secondary);
+/* Search Bar */
+.search-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    width: 200px;
+    margin-bottom: 0;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    width: 250px;
+    border-color: var(--accent);
+    outline: none;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Streak Badge */
+.streak-badge {
+    display: inline-block;
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    margin-top: 0.5rem;
+    font-weight: 800;
+    text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+    }
+
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(251, 191, 36, 0);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    }
+}
+
+/* Tag Chips */
+.tags-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.tag-chip {
+    background: rgba(139, 92, 246, 0.2);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    color: #c4b5fd;
+    padding: 0.2rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
 }

@@ -1,6 +1,8 @@
 // State Management
 let logs = [];
 let cards = [];
+let fullLogs = [];
+let fullCards = [];
 let currentCardIndex = 0;
 let supabaseClient = null;
 
@@ -51,13 +53,16 @@ async function loadFromSupabase() {
     const { data: dbLogs, error: logError } = await supabaseClient.from('logs').select('*').order('id', { ascending: false });
     if (!logError && dbLogs) {
         logs = dbLogs;
+        fullLogs = [...logs]; // Sync master list
         renderLogs();
+        calculateStreak();
         localStorage.setItem('study_logs', JSON.stringify(logs));
     }
     // Cards
     const { data: dbCards, error: cardError } = await supabaseClient.from('cards').select('*');
     if (!cardError && dbCards) {
         cards = dbCards;
+        fullCards = [...cards]; // Sync master list
         if (cards.length > 0) renderCard(0);
         localStorage.setItem('study_cards', JSON.stringify(cards));
     }
@@ -84,17 +89,21 @@ function addLog() {
     const contentEl = document.getElementById('log-content');
     if (!topicEl || !contentEl) return alert('Campos de log não encontrados');
     const topic = topicEl.value.trim();
+    const tagsVal = document.getElementById('log-tags')?.value.trim() || '';
     const content = contentEl.value.trim();
     if (!topic || !content) return alert('Preencha tópico e conteúdo');
     const entry = {
         id: Date.now(),
         date: new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
         topic,
+        tags: tagsVal, // Save tags
         content
     };
     console.log('Attempting to insert log entry', entry, 'Supabase client?', !!supabaseClient);
     logs.unshift(entry);
+    fullLogs.unshift(entry); // Keep master list in sync
     renderLogs();
+    calculateStreak(); // meaningful action update
     if (supabaseClient) {
         supabaseClient.from('logs').insert([entry]).then(({ error }) => {
             if (error) console.error('Supabase insert error', error);
@@ -139,6 +148,7 @@ function renderLogs() {
         <div>
           <div class="log-date">${log.date}</div>
           <h3 style="color:var(--accent);margin-bottom:0.5rem;">${log.topic}</h3>
+          ${log.tags ? `<div class="tags-container">${log.tags.split(',').map(t => `<span class="tag-chip">${t.trim()}</span>`).join('')}</div>` : ''}
         </div>
         <button class="delete-btn" onclick="deleteLog(${log.id})" title="Apagar">🗑️</button>
       </div>
@@ -232,17 +242,29 @@ function exportData() {
 window.exportData = exportData;
 
 function importData(input) {
-    if (!confirm('Esta ação substituirá TODOS os dados. Continuar?')) { input.value = ''; return; }
+    if (!confirm('Esta ação substituirá TODOS os dados. Continuar?')) { if (input) input.value = ''; return; }
     const file = input.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = e => {
         try {
             const data = JSON.parse(e.target.result);
-            if (data.logs) { logs = data.logs; localStorage.setItem('study_logs', JSON.stringify(logs)); }
-            if (data.cards) { cards = data.cards; localStorage.setItem('study_cards', JSON.stringify(cards)); }
-            alert('Backup restaurado! Recarregando...');
-            location.reload();
+            if (data.logs) {
+                logs = data.logs;
+                fullLogs = [...logs];
+                localStorage.setItem('study_logs', JSON.stringify(logs));
+            }
+            if (data.cards) {
+                cards = data.cards;
+                fullCards = [...cards];
+                localStorage.setItem('study_cards', JSON.stringify(cards));
+            }
+
+            renderLogs();
+            renderCard(0);
+            calculateStreak();
+
+            alert('Backup restaurado com sucesso!');
         } catch (err) { alert('Erro ao ler backup'); console.error(err); }
     };
     reader.readAsText(file);
@@ -261,3 +283,91 @@ function saveConnection() {
     location.reload();
 }
 window.saveConnection = saveConnection;
+
+// ---------- New Features: Search, Streak ----------
+
+function handleSearch(query) {
+    const term = query.toLowerCase();
+
+    if (!term) {
+        logs = [...fullLogs];
+        cards = [...fullCards];
+    } else {
+        logs = fullLogs.filter(log =>
+            log.topic.toLowerCase().includes(term) ||
+            log.content.toLowerCase().includes(term) ||
+            (log.tags && log.tags.toLowerCase().includes(term))
+        );
+        cards = fullCards.filter(card =>
+            card.front.toLowerCase().includes(term) ||
+            card.back.toLowerCase().includes(term)
+        );
+    }
+
+    renderLogs();
+    currentCardIndex = 0;
+    if (cards.length === 0) {
+        document.getElementById('card-front-text').textContent = 'Sem resultados';
+        document.getElementById('card-back-text').textContent = '...';
+        document.getElementById('active-card').classList.remove('flipped');
+    } else {
+        renderCard(0);
+    }
+}
+window.handleSearch = handleSearch;
+
+function calculateStreak() {
+    if (!logs || logs.length === 0) {
+        updateStreakDisplay(0);
+        return;
+    }
+
+    // Get unique days from timestamps (ids)
+    const uniqueDays = [...new Set(logs.map(l => {
+        const d = new Date(l.id);
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD
+    }))].sort().reverse();
+
+    if (uniqueDays.length === 0) {
+        updateStreakDisplay(0);
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    // Check if streak is active (studied today or yesterday)
+    // If most recent study was before yesterday, streak is broken -> 0
+    if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) {
+        updateStreakDisplay(0);
+        return;
+    }
+
+    let streak = 1;
+    let currentCheck = uniqueDays[0]; // Start with the most recent active day
+
+    // Count backwards
+    for (let i = 1; i < uniqueDays.length; i++) {
+        const expectedPrev = new Date(new Date(currentCheck).getTime() - 86400000).toISOString().split('T')[0];
+        // Handle timezone edge cases roughly or just string compare
+        // Actually: new Date('2023-01-02') is UTC midnight.
+        // It's safer to just subtract 1 day from Date object.
+
+        if (uniqueDays[i] === expectedPrev) {
+            streak++;
+            currentCheck = expectedPrev;
+        } else {
+            break;
+        }
+    }
+    updateStreakDisplay(streak);
+}
+window.calculateStreak = calculateStreak;
+
+function updateStreakDisplay(days) {
+    const el = document.getElementById('streak-display');
+    if (el) {
+        el.style.display = 'inline-block';
+        el.innerHTML = `🔥 ${days} dia${days !== 1 ? 's' : ''} seguido${days !== 1 ? 's' : ''}!`;
+    }
+}

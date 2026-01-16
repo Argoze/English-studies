@@ -13,10 +13,21 @@
 
 <body>
 
-    <nav>
+    <header style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="margin-bottom: 0.5rem;">English & Code Hub</h1>
+        <div id="streak-display" class="streak-badge" style="display: none;">
+            🔥 0 dias seguidos!
+        </div>
+    </header>
+
+    <nav style="flex-wrap: wrap; justify-content: center; align-items: center;">
         <button class="nav-btn active" onclick="switchView('journal', this)">Diário</button>
         <button class="nav-btn" onclick="switchView('flashcards', this)">Perguntas</button>
 
+        <div class="search-container" style="margin-left: 1rem;">
+            <input type="text" id="search-input" placeholder="🔍 Buscar..." oninput="handleSearch(this.value)"
+                class="search-input">
+        </div>
     </nav>
 
     <main>
@@ -25,6 +36,8 @@
             <div class="input-group">
                 <h3>o que foi aprendido hoje?</h3>
                 <input type="text" id="log-topic" placeholder="Topico">
+                <input type="text" id="log-tags" placeholder="Tags (ex: react, grammar, verbo to-be)"
+                    style="margin-bottom: 1rem;">
                 <textarea id="log-content" rows="4" placeholder="Descrição"></textarea>
                 <button class="action-btn" onclick="addLog()">Salvar entrada</button>
             </div>
