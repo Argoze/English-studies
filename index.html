@@ -70,7 +70,11 @@
 
             <div class="controls">
                 <button class="nav-btn" onclick="prevCard()">Anterior</button>
-                <button class="delete-btn" onclick="deleteCurrentCard()" title="Apagar Cartão">🗑️</button>
+                <div class="action-buttons">
+                    <button id="edit-card-btn" class="edit-btn" onclick="toggleEditCard()"
+                        title="Editar Cartão">✏️</button>
+                    <button class="delete-btn" onclick="deleteCurrentCard()" title="Apagar Cartão">🗑️</button>
+                </div>
                 <button class="nav-btn" onclick="nextCard()">Proximo</button>
             </div>
         </section>

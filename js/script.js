@@ -1,9 +1,9 @@
 // State Management
 let logs = [];
-let cards = [];
 let fullLogs = [];
 let fullCards = [];
 let currentCardIndex = 0;
+let isEditingCard = false; // State for edit mode
 let supabaseClient = null;
 
 // Config (hard‑coded for always‑on connection)
@@ -142,7 +142,22 @@ function renderLogs() {
     const container = document.getElementById('entries-list');
     if (!container) return;
     const parse = (typeof marked !== 'undefined' && marked.parse) ? marked.parse : text => text;
-    container.innerHTML = logs.map(log => `
+    container.innerHTML = logs.map(log => {
+        if (editingLogId && log.id == editingLogId) {
+            // Edit Mode Template
+            return `
+            <div class="log-entry editing-entry">
+                <input type="text" id="edit-topic-${log.id}" value="${log.topic}" placeholder="Tópico" class="edit-card-input" style="height:auto;margin-bottom:0.5rem;font-size:1.1rem;font-weight:bold;">
+                <input type="text" id="edit-tags-${log.id}" value="${log.tags || ''}" placeholder="Tags (ex: react, grammar)" class="edit-card-input" style="height:auto;margin-bottom:0.5rem;font-size:0.9rem;">
+                <textarea id="edit-content-${log.id}" class="edit-card-input" rows="4" style="font-size:1rem;line-height:1.5;">${log.content}</textarea>
+                <div style="margin-top:0.5rem;text-align:right;">
+                    <button class="nav-btn" onclick="cancelLogEdit()" style="background:transparent;border:1px solid #fff;">Cancelar</button>
+                    <button class="nav-btn active" onclick="saveLogEdit(${log.id})">Salvar</button>
+                </div>
+            </div>`;
+        }
+        // Normal Mode Template
+        return `
     <div class="log-entry">
       <div class="entry-header" style="display:flex;justify-content:space-between;align-items:start;">
         <div>
@@ -150,11 +165,15 @@ function renderLogs() {
           <h3 style="color:var(--accent);margin-bottom:0.5rem;">${log.topic}</h3>
           ${log.tags ? `<div class="tags-container">${log.tags.split(',').map(t => `<span class="tag-chip">${t.trim()}</span>`).join('')}</div>` : ''}
         </div>
-        <button class="delete-btn" onclick="deleteLog(${log.id})" title="Apagar">🗑️</button>
+        </div>
+        <div class="action-buttons">
+            <button class="edit-btn" onclick="editLog(${log.id})" title="Editar">✏️</button>
+            <button class="delete-btn" onclick="deleteLog(${log.id})" title="Apagar">🗑️</button>
+        </div>
       </div>
       <div class="log-content-body">${parse(log.content)}</div>
-    </div>
-  `).join('');
+    </div>`;
+    }).join('');
 }
 
 // ---------- Flashcards ----------
@@ -227,6 +246,152 @@ function deleteCurrentCard() {
     }
 }
 window.deleteCurrentCard = deleteCurrentCard;
+
+function toggleEditCard() {
+    if (cards.length === 0) return;
+    isEditingCard = !isEditingCard;
+    const btn = document.getElementById('edit-card-btn');
+    const deleteBtn = document.querySelector('.controls .delete-btn');
+    const navs = document.querySelectorAll('.controls .nav-btn');
+
+    if (isEditingCard) {
+        // Enter Edit Mode
+        const card = cards[currentCardIndex];
+        const frontContainer = document.querySelector('.card-front');
+        const backContainer = document.querySelector('.card-back');
+
+        // Disable navigation while editing
+        navs.forEach(b => b.disabled = true);
+        deleteBtn.style.display = 'none';
+
+        // Swap text for inputs
+        frontContainer.innerHTML = `<span class="card-label">Editar Pergunta</span>
+            <textarea id="edit-front-input" class="edit-card-input" placeholder="Pergunta">${card.front}</textarea>`;
+        backContainer.innerHTML = `<span class="card-label">Editar Resposta</span>
+            <textarea id="edit-back-input" class="edit-card-input" placeholder="Resposta">${card.back}</textarea>`;
+
+        // Disable flip animation temporarily or just ensure we can see both?
+        // Actually, inputs inside the 3D card might be tricky if flipped.
+        // Simplification: Auto-flip to front when editing starts.
+        document.getElementById('active-card').classList.remove('flipped');
+
+        btn.textContent = '💾'; // Save icon
+        btn.title = 'Salvar Alterações';
+    } else {
+        // Save Changes
+        saveCardEdit();
+    }
+}
+window.toggleEditCard = toggleEditCard;
+
+let editingLogId = null;
+
+function editLog(id) {
+    if (editingLogId) return alert('Finalize a edição atual primeiro!');
+    const log = logs.find(l => l.id == id); // Loose equality
+    if (!log) return;
+
+    // Find the log DOM element (we need a way to target it specifically)
+    // We can rely on renderLogs re-rendering, but to do it inline we need a unique ID on the div.
+    // Let's modify renderLogs first to add ID? 
+    // Or just re-render the whole list but with one item in "edit mode" state?
+    // State-based rendering is cleaner.
+    editingLogId = id;
+    renderLogs();
+}
+window.editLog = editLog;
+
+function cancelLogEdit() {
+    editingLogId = null;
+    renderLogs();
+}
+window.cancelLogEdit = cancelLogEdit;
+
+function saveLogEdit(id) {
+    const topicVal = document.getElementById(`edit-topic-${id}`).value.trim();
+    const tagsVal = document.getElementById(`edit-tags-${id}`).value.trim();
+    const contentVal = document.getElementById(`edit-content-${id}`).value.trim();
+
+    if (!topicVal || !contentVal) return alert('Tópico e Conteúdo são obrigatórios');
+
+    const logIndex = logs.findIndex(l => l.id == id);
+    if (logIndex === -1) return;
+
+    // Update Local
+    logs[logIndex].topic = topicVal;
+    logs[logIndex].tags = tagsVal;
+    logs[logIndex].content = contentVal;
+
+    // Update Master
+    const fullIndex = fullLogs.findIndex(l => l.id == id);
+    if (fullIndex !== -1) {
+        fullLogs[fullIndex] = logs[logIndex];
+    }
+
+    // Persist
+    localStorage.setItem('study_logs', JSON.stringify(logs));
+
+    if (supabaseClient) {
+        supabaseClient.from('logs').update({
+            topic: topicVal,
+            tags: tagsVal,
+            content: contentVal
+        }).eq('id', id).then(({ error }) => {
+            if (error) console.error('Supabase log update error', error);
+            else console.log('Log updated successfully');
+        });
+    }
+
+    editingLogId = null;
+    renderLogs();
+}
+window.saveLogEdit = saveLogEdit;
+
+function saveCardEdit() {
+    const frontVal = document.getElementById('edit-front-input').value.trim();
+    const backVal = document.getElementById('edit-back-input').value.trim();
+
+    if (!frontVal || !backVal) {
+        alert('Os campos não podem ficar vazios!');
+        isEditingCard = true; // Stay in edit mode
+        return;
+    }
+
+    // Update Local Data
+    const card = cards[currentCardIndex];
+    card.front = frontVal;
+    card.back = backVal;
+
+    // Update Master List if searching
+    // (If using fullCards, need to update that too!)
+    const masterIdx = fullCards.findIndex(c => c.id === card.id);
+    if (masterIdx !== -1) {
+        fullCards[masterIdx] = card;
+    }
+
+    localStorage.setItem('study_cards', JSON.stringify(cards));
+
+    // Update Supabase
+    if (supabaseClient && card.id) {
+        supabaseClient.from('cards').update({ front: frontVal, back: backVal }).eq('id', card.id).then(({ error }) => {
+            if (error) console.error('Supabase update error', error);
+            else console.log('Card updated successfully');
+        });
+    }
+
+    // Restore UI
+    const navs = document.querySelectorAll('.controls .nav-btn');
+    const deleteBtn = document.querySelector('.controls .delete-btn');
+    navs.forEach(b => b.disabled = false);
+    deleteBtn.style.display = 'inline-block';
+
+    renderCard(currentCardIndex); // Helper to restore HTML structure
+
+    const btn = document.getElementById('edit-card-btn');
+    btn.textContent = '✏️';
+    btn.title = 'Editar Cartão';
+}
+window.saveCardEdit = saveCardEdit;
 
 // ---------- Backup ----------
 function exportData() {
