@@ -23,7 +23,7 @@ function initApp() {
         cards = [];
     }
     renderLogs();
-    if (cards.length > 0) renderCard(0);
+    renderCardsGrid();
 
     // Try to connect to Supabase (hard‑coded)
     if (typeof window.supabase !== 'undefined') {
@@ -63,7 +63,7 @@ async function loadFromSupabase() {
     if (!cardError && dbCards) {
         cards = dbCards;
         fullCards = [...cards]; // Sync master list
-        if (cards.length > 0) renderCard(0);
+        renderCardsGrid();
         localStorage.setItem('study_cards', JSON.stringify(cards));
     }
 }
@@ -80,7 +80,6 @@ function switchView(viewId, btnEl) {
         btnEl.classList.add('active');
     }
 }
-// expose for HTML inline calls
 window.switchView = switchView;
 
 // ---------- Journal ----------
@@ -96,18 +95,16 @@ function addLog() {
         id: Date.now(),
         date: new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
         topic,
-        tags: tagsVal, // Save tags
+        tags: tagsVal,
         content
     };
-    console.log('Attempting to insert log entry', entry, 'Supabase client?', !!supabaseClient);
     logs.unshift(entry);
-    fullLogs.unshift(entry); // Keep master list in sync
+    fullLogs.unshift(entry);
     renderLogs();
-    calculateStreak(); // meaningful action update
+    calculateStreak();
     if (supabaseClient) {
         supabaseClient.from('logs').insert([entry]).then(({ error }) => {
             if (error) console.error('Supabase insert error', error);
-            else console.log('Log entry inserted successfully');
         });
     }
     saveLogs();
@@ -121,17 +118,12 @@ function saveLogs() {
 }
 
 function deleteLog(id) {
-    if (!confirm('Apagar este registro?')) {
-        return;
-    }
-    // Use, loose equality to catch string/number mismatches
+    if (!confirm('Apagar este registro?')) return;
     logs = logs.filter(l => l.id != id);
-
     renderLogs();
     if (supabaseClient) {
         supabaseClient.from('logs').delete().eq('id', id).then(({ error }) => {
             if (error) console.error('Supabase delete error', error);
-            else console.log('Supabase delete success');
         });
     }
     saveLogs();
@@ -144,7 +136,6 @@ function renderLogs() {
     const parse = (typeof marked !== 'undefined' && marked.parse) ? marked.parse : text => text;
     container.innerHTML = logs.map(log => {
         if (editingLogId && log.id == editingLogId) {
-            // Edit Mode Template
             return `
             <div class="log-entry editing-entry">
                 <input type="text" id="edit-topic-${log.id}" value="${log.topic}" placeholder="Tópico" class="edit-card-input" style="height:auto;margin-bottom:0.5rem;font-size:1.1rem;font-weight:bold;">
@@ -156,7 +147,6 @@ function renderLogs() {
                 </div>
             </div>`;
         }
-        // Normal Mode Template
         return `
     <div class="log-entry">
       <div class="entry-header" style="display:flex;justify-content:space-between;align-items:start;">
@@ -175,7 +165,28 @@ function renderLogs() {
     }).join('');
 }
 
-// ---------- Flashcards ----------
+// ---------- Flashcards (Grid & Modal) ----------
+
+// 1. Render Grid
+function renderCardsGrid() {
+    const grid = document.getElementById('cards-grid');
+    if (!grid) return;
+
+    if (cards.length === 0) {
+        grid.innerHTML = '<p style="text-align:center;width:100%;">Nenhum cartão encontrado. Adicione um acima!</p>';
+        return;
+    }
+
+    grid.innerHTML = cards.map((card, index) => `
+        <div class="grid-card" onclick="openStudyModal(${index})">
+            <label>PERGUNTA</label>
+            <div class="grid-card-content">${card.front}</div>
+        </div>
+    `).join('');
+}
+window.renderCardsGrid = renderCardsGrid;
+
+// 2. Add Card
 function addCard() {
     const frontEl = document.getElementById('card-front');
     const backEl = document.getElementById('card-back');
@@ -184,67 +195,98 @@ function addCard() {
     const back = backEl.value.trim();
     if (!front || !back) return alert('Preencha frente e verso');
     const newCard = { id: Date.now(), front, back };
-    console.log('Attempting to insert card', newCard, 'Supabase client?', !!supabaseClient);
+
     cards.push(newCard);
+    fullCards.push(newCard); // Sync master list
+
     if (supabaseClient) {
         supabaseClient.from('cards').insert([newCard]).then(({ error }) => {
             if (error) console.error('Supabase card error', error);
-            else console.log('Card inserted successfully');
         });
     }
     localStorage.setItem('study_cards', JSON.stringify(cards));
     frontEl.value = '';
     backEl.value = '';
-    if (cards.length === 1) renderCard(0);
+
+    renderCardsGrid();
     alert('Cartão adicionado!');
 }
 window.addCard = addCard;
 
-function renderCard(idx) {
+// 3. Modal Logic
+function openStudyModal(index) {
+    currentCardIndex = index;
+    renderCardInModal();
+    document.getElementById('study-modal').style.display = 'flex';
+}
+window.openStudyModal = openStudyModal;
+
+function closeStudyModal() {
+    // If editing, maybe prompt or just cancel edit?
+    if (isEditingCard) toggleEditCard(); // Force exit edit mode
+    document.getElementById('study-modal').style.display = 'none';
+}
+window.closeStudyModal = closeStudyModal;
+
+function renderCardInModal() {
     if (cards.length === 0) return;
-    const card = cards[idx];
+    const card = cards[currentCardIndex];
     const front = document.getElementById('card-front-text');
     const back = document.getElementById('card-back-text');
     const el = document.getElementById('active-card');
+
+    // Reset state
     if (el) el.classList.remove('flipped');
+
+    // Safety check if elements exist (modal might be hidden/removed)
     if (front) front.textContent = card.front;
     if (back) back.textContent = card.back;
 }
-window.renderCard = renderCard;
 
 function flipCard() {
-    if (isEditingCard) return; // Disable flip when editing
+    if (isEditingCard) return;
     document.getElementById('active-card').classList.toggle('flipped');
 }
 window.flipCard = flipCard;
 
-function nextCard() { if (cards.length === 0) return; currentCardIndex = (currentCardIndex + 1) % cards.length; renderCard(currentCardIndex); }
-function prevCard() { if (cards.length === 0) return; currentCardIndex = (currentCardIndex - 1 + cards.length) % cards.length; renderCard(currentCardIndex); }
+function nextCard() {
+    if (cards.length === 0) return;
+    currentCardIndex = (currentCardIndex + 1) % cards.length;
+    renderCardInModal();
+}
+
+function prevCard() {
+    if (cards.length === 0) return;
+    currentCardIndex = (currentCardIndex - 1 + cards.length) % cards.length;
+    renderCardInModal();
+}
 window.nextCard = nextCard;
 window.prevCard = prevCard;
 
 function deleteCurrentCard() {
     if (cards.length === 0) return;
-    if (!confirm('Apagar este cartão?')) {
-        return;
-    }
+    if (!confirm('Apagar este cartão?')) return;
+
     const toDel = cards[currentCardIndex];
     cards.splice(currentCardIndex, 1);
+    // Also remove from master list if needed, or rely on reload
+    const masterIdx = fullCards.findIndex(c => c.id === toDel.id);
+    if (masterIdx !== -1) fullCards.splice(masterIdx, 1);
 
     if (supabaseClient && toDel.id) {
         supabaseClient.from('cards').delete().eq('id', toDel.id).then(({ error }) => {
             if (error) console.error('Supabase del card error', error);
-            else console.log('Supabase card delete success');
         });
     }
     localStorage.setItem('study_cards', JSON.stringify(cards));
-    if (currentCardIndex >= cards.length) currentCardIndex = Math.max(0, cards.length - 1);
+
     if (cards.length === 0) {
-        document.getElementById('card-front-text').textContent = 'Adicione um cartão!';
-        document.getElementById('card-back-text').textContent = '...';
-        document.getElementById('active-card').classList.remove('flipped');
+        closeStudyModal();
+        renderCardsGrid();
     } else {
-        renderCard(currentCardIndex);
+        if (currentCardIndex >= cards.length) currentCardIndex = 0;
+        renderCardInModal();
+        renderCardsGrid(); // Update background grid too
     }
 }
 window.deleteCurrentCard = deleteCurrentCard;
@@ -252,16 +294,18 @@ window.deleteCurrentCard = deleteCurrentCard;
 function toggleEditCard() {
     if (cards.length === 0) return;
     isEditingCard = !isEditingCard;
-    const btn = document.getElementById('edit-card-btn');
-    const deleteBtn = document.querySelector('.controls .delete-btn');
-    const navs = document.querySelectorAll('.controls .nav-btn');
+
+    // Scoped selectors within the modal
+    const modalContent = document.querySelector('.modal-content');
+    const btn = modalContent.querySelector('#edit-card-btn');
+    const deleteBtn = modalContent.querySelector('.delete-btn');
+    const navs = modalContent.querySelectorAll('.nav-btn');
+    const activeCard = document.getElementById('active-card');
 
     if (isEditingCard) {
         // Enter Edit Mode
         const card = cards[currentCardIndex];
-        const activeCard = document.getElementById('active-card');
 
-        // Disable navigation while editing
         navs.forEach(b => b.disabled = true);
         deleteBtn.style.display = 'none';
 
@@ -271,11 +315,10 @@ function toggleEditCard() {
         const frontContainer = activeCard.querySelector('.card-front .card-content');
         const backContainer = activeCard.querySelector('.card-back .card-content');
 
-        // Swap text for inputs with stopPropagation
         frontContainer.innerHTML = `<textarea id="edit-front-input" class="edit-card-input" placeholder="Pergunta" onclick="event.stopPropagation()">${card.front}</textarea>`;
         backContainer.innerHTML = `<textarea id="edit-back-input" class="edit-card-input" placeholder="Resposta" onclick="event.stopPropagation()">${card.back}</textarea>`;
 
-        btn.textContent = '💾'; // Save icon
+        btn.textContent = '💾';
         btn.title = 'Salvar Alterações';
     } else {
         // Save Changes
@@ -284,18 +327,55 @@ function toggleEditCard() {
 }
 window.toggleEditCard = toggleEditCard;
 
+function saveCardEdit() {
+    const frontVal = document.getElementById('edit-front-input').value.trim();
+    const backVal = document.getElementById('edit-back-input').value.trim();
+
+    if (!frontVal || !backVal) {
+        alert('Os campos não podem ficar vazios!');
+        isEditingCard = true;
+        return;
+    }
+
+    const card = cards[currentCardIndex];
+    card.front = frontVal;
+    card.back = backVal;
+
+    // Update master list
+    const masterIdx = fullCards.findIndex(c => c.id === card.id);
+    if (masterIdx !== -1) fullCards[masterIdx] = card;
+
+    localStorage.setItem('study_cards', JSON.stringify(cards));
+
+    if (supabaseClient && card.id) {
+        supabaseClient.from('cards').update({ front: frontVal, back: backVal }).eq('id', card.id).then(({ error }) => {
+            if (error) console.error('Supabase update error', error);
+        });
+    }
+
+    // Restore UI
+    const modalContent = document.querySelector('.modal-content');
+    const navs = modalContent.querySelectorAll('.nav-btn');
+    const deleteBtn = modalContent.querySelector('.delete-btn');
+    navs.forEach(b => b.disabled = false);
+    deleteBtn.style.display = 'inline-block';
+
+    renderCardInModal(); // Restore HTML
+    renderCardsGrid();   // Update Grid Background
+
+    const btn = document.getElementById('edit-card-btn');
+    btn.textContent = '✏️';
+    btn.title = 'Editar Cartão';
+}
+window.saveCardEdit = saveCardEdit;
+
+// ---------- Log Editing ----------
 let editingLogId = null;
 
 function editLog(id) {
     if (editingLogId) return alert('Finalize a edição atual primeiro!');
-    const log = logs.find(l => l.id == id); // Loose equality
+    const log = logs.find(l => l.id == id);
     if (!log) return;
-
-    // Find the log DOM element (we need a way to target it specifically)
-    // We can rely on renderLogs re-rendering, but to do it inline we need a unique ID on the div.
-    // Let's modify renderLogs first to add ID? 
-    // Or just re-render the whole list but with one item in "edit mode" state?
-    // State-based rendering is cleaner.
     editingLogId = id;
     renderLogs();
 }
@@ -317,18 +397,13 @@ function saveLogEdit(id) {
     const logIndex = logs.findIndex(l => l.id == id);
     if (logIndex === -1) return;
 
-    // Update Local
     logs[logIndex].topic = topicVal;
     logs[logIndex].tags = tagsVal;
     logs[logIndex].content = contentVal;
 
-    // Update Master
     const fullIndex = fullLogs.findIndex(l => l.id == id);
-    if (fullIndex !== -1) {
-        fullLogs[fullIndex] = logs[logIndex];
-    }
+    if (fullIndex !== -1) fullLogs[fullIndex] = logs[logIndex];
 
-    // Persist
     localStorage.setItem('study_logs', JSON.stringify(logs));
 
     if (supabaseClient) {
@@ -338,7 +413,6 @@ function saveLogEdit(id) {
             content: contentVal
         }).eq('id', id).then(({ error }) => {
             if (error) console.error('Supabase log update error', error);
-            else console.log('Log updated successfully');
         });
     }
 
@@ -346,52 +420,6 @@ function saveLogEdit(id) {
     renderLogs();
 }
 window.saveLogEdit = saveLogEdit;
-
-function saveCardEdit() {
-    const frontVal = document.getElementById('edit-front-input').value.trim();
-    const backVal = document.getElementById('edit-back-input').value.trim();
-
-    if (!frontVal || !backVal) {
-        alert('Os campos não podem ficar vazios!');
-        isEditingCard = true; // Stay in edit mode
-        return;
-    }
-
-    // Update Local Data
-    const card = cards[currentCardIndex];
-    card.front = frontVal;
-    card.back = backVal;
-
-    // Update Master List if searching
-    // (If using fullCards, need to update that too!)
-    const masterIdx = fullCards.findIndex(c => c.id === card.id);
-    if (masterIdx !== -1) {
-        fullCards[masterIdx] = card;
-    }
-
-    localStorage.setItem('study_cards', JSON.stringify(cards));
-
-    // Update Supabase
-    if (supabaseClient && card.id) {
-        supabaseClient.from('cards').update({ front: frontVal, back: backVal }).eq('id', card.id).then(({ error }) => {
-            if (error) console.error('Supabase update error', error);
-            else console.log('Card updated successfully');
-        });
-    }
-
-    // Restore UI
-    const navs = document.querySelectorAll('.controls .nav-btn');
-    const deleteBtn = document.querySelector('.controls .delete-btn');
-    navs.forEach(b => b.disabled = false);
-    deleteBtn.style.display = 'inline-block';
-
-    renderCard(currentCardIndex); // Helper to restore HTML structure
-
-    const btn = document.getElementById('edit-card-btn');
-    btn.textContent = '✏️';
-    btn.title = 'Editar Cartão';
-}
-window.saveCardEdit = saveCardEdit;
 
 // ---------- Backup ----------
 function exportData() {
@@ -416,19 +444,17 @@ function importData(input) {
             const data = JSON.parse(e.target.result);
             if (data.logs) {
                 logs = data.logs;
-                fullLogs = [...logs];
+                fullLogs = [...logs]; // Sync
                 localStorage.setItem('study_logs', JSON.stringify(logs));
             }
             if (data.cards) {
                 cards = data.cards;
-                fullCards = [...cards];
+                fullCards = [...cards]; // Sync
                 localStorage.setItem('study_cards', JSON.stringify(cards));
             }
-
             renderLogs();
-            renderCard(0);
+            renderCardsGrid();
             calculateStreak();
-
             alert('Backup restaurado com sucesso!');
         } catch (err) { alert('Erro ao ler backup'); console.error(err); }
     };
@@ -437,20 +463,7 @@ function importData(input) {
 }
 window.importData = importData;
 
-// ---------- Connection UI (kept for completeness) ----------
-function saveConnection() {
-    const url = document.getElementById('supabase-url').value;
-    const key = document.getElementById('supabase-key').value;
-    if (!url || !key) return alert('Preencha ambos os campos!');
-    localStorage.setItem('supabase_url', url);
-    localStorage.setItem('supabase_key', key);
-    alert('Dados salvos! Recarregando...');
-    location.reload();
-}
-window.saveConnection = saveConnection;
-
-// ---------- New Features: Search, Streak ----------
-
+// ---------- Search & Streak ----------
 function handleSearch(query) {
     const term = query.toLowerCase();
 
@@ -470,14 +483,7 @@ function handleSearch(query) {
     }
 
     renderLogs();
-    currentCardIndex = 0;
-    if (cards.length === 0) {
-        document.getElementById('card-front-text').textContent = 'Sem resultados';
-        document.getElementById('card-back-text').textContent = '...';
-        document.getElementById('active-card').classList.remove('flipped');
-    } else {
-        renderCard(0);
-    }
+    renderCardsGrid(); // Will allow user to see search results in Grid
 }
 window.handleSearch = handleSearch;
 
@@ -486,11 +492,9 @@ function calculateStreak() {
         updateStreakDisplay(0);
         return;
     }
-
-    // Get unique days from timestamps (ids)
     const uniqueDays = [...new Set(logs.map(l => {
         const d = new Date(l.id);
-        return d.toISOString().split('T')[0]; // YYYY-MM-DD
+        return d.toISOString().split('T')[0];
     }))].sort().reverse();
 
     if (uniqueDays.length === 0) {
@@ -501,23 +505,15 @@ function calculateStreak() {
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
-    // Check if streak is active (studied today or yesterday)
-    // If most recent study was before yesterday, streak is broken -> 0
     if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) {
         updateStreakDisplay(0);
         return;
     }
 
     let streak = 1;
-    let currentCheck = uniqueDays[0]; // Start with the most recent active day
-
-    // Count backwards
+    let currentCheck = uniqueDays[0];
     for (let i = 1; i < uniqueDays.length; i++) {
         const expectedPrev = new Date(new Date(currentCheck).getTime() - 86400000).toISOString().split('T')[0];
-        // Handle timezone edge cases roughly or just string compare
-        // Actually: new Date('2023-01-02') is UTC midnight.
-        // It's safer to just subtract 1 day from Date object.
-
         if (uniqueDays[i] === expectedPrev) {
             streak++;
             currentCheck = expectedPrev;

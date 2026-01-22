@@ -55,27 +55,39 @@
                 <button class="action-btn" onclick="addCard()">Adicionar Pergunta</button>
             </div>
 
-            <div class="flashcard-container" onclick="flipCard()">
-                <div class="flashcard" id="active-card">
-                    <div class="card-front">
-                        <span class="card-label">Pergunta</span>
-                        <div class="card-content" id="card-front-text">Adicione uma pergunta!</div>
-                    </div>
-                    <div class="card-back">
-                        <span class="card-label">Resposta</span>
-                        <div class="card-content" id="card-back-text">Adicione uma resposta!</div>
-                    </div>
-                </div>
+            <!-- Cards Grid -->
+            <div id="cards-grid" class="cards-grid">
+                <!-- Javascript will populate this -->
             </div>
 
-            <div class="controls">
-                <button class="nav-btn" onclick="prevCard()">Anterior</button>
-                <div class="action-buttons">
-                    <button id="edit-card-btn" class="edit-btn" onclick="toggleEditCard()"
-                        title="Editar Cartão">✏️</button>
-                    <button class="delete-btn" onclick="deleteCurrentCard()" title="Apagar Cartão">🗑️</button>
+            <!-- Study Modal -->
+            <div id="study-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content">
+                    <button class="close-modal-btn" onclick="closeStudyModal()">×</button>
+
+                    <div class="flashcard-container" onclick="flipCard()">
+                        <div class="flashcard" id="active-card">
+                            <div class="card-front">
+                                <span class="card-label">Pergunta</span>
+                                <div class="card-content" id="card-front-text">...</div>
+                            </div>
+                            <div class="card-back">
+                                <span class="card-label">Resposta</span>
+                                <div class="card-content" id="card-back-text">...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="controls">
+                        <button class="nav-btn" onclick="prevCard()">Anterior</button>
+                        <div class="action-buttons">
+                            <button id="edit-card-btn" class="edit-btn" onclick="toggleEditCard()"
+                                title="Editar Cartão">✏️</button>
+                            <button class="delete-btn" onclick="deleteCurrentCard()" title="Apagar Cartão">🗑️</button>
+                        </div>
+                        <button class="nav-btn" onclick="nextCard()">Próximo</button>
+                    </div>
                 </div>
-                <button class="nav-btn" onclick="nextCard()">Proximo</button>
             </div>
         </section>
     </main>
