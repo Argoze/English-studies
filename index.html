@@ -13,7 +13,10 @@
 
 <body>
 
-    <header style="text-align: center; margin-bottom: 2rem;">
+    <header style="text-align: center; margin-bottom: 2rem; position: relative;">
+        <button onclick="openSettingsModal()"
+            style="position: absolute; top: 0; right: 1rem; background: transparent; border: none; font-size: 1.5rem; cursor: pointer;"
+            title="Configurações & Dados">⚙️</button>
         <h1 style="margin-bottom: 0.5rem;">English & Code Hub</h1>
         <div id="streak-display" class="streak-badge" style="display: none;">
             🔥 0 dias seguidos!
@@ -76,7 +79,10 @@
             <div id="study-modal" class="modal-overlay" style="display: none;">
                 <div class="modal-content">
                     <button class="close-modal-btn" onclick="closeStudyModal()">×</button>
+                    <!-- ... content ... -->
 
+                    <!-- Copy existing content structure here to be safe or just close the div properly -->
+                    <!-- Wait, replacement must be exact. I will just append the Settings Modal after sections -->
                     <div class="flashcard-container" onclick="flipCard()">
                         <div class="flashcard" id="active-card">
                             <div class="card-front">
@@ -102,6 +108,42 @@
                 </div>
             </div>
         </section>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content" style="text-align: left;">
+                <button class="close-modal-btn" onclick="closeSettingsModal()">×</button>
+                <h2 style="color: var(--accent); margin-bottom: 1.5rem;">⚙️ Configurações & Dados</h2>
+
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">📦 Backup / Transferência</h3>
+                    <p style="margin-bottom: 1rem; color: #cbd5e1;">Use isso para transferir seus dados do Computador
+                        para o Site Online (GitHub).</p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <button class="action-btn" onclick="exportData()" style="flex: 1;">📥 Baixar Dados
+                            (Exportar)</button>
+                        <div style="flex: 1; position: relative;">
+                            <input type="file" id="import-file" style="display: none;" onchange="importData(this)">
+                            <button class="action-btn" onclick="document.getElementById('import-file').click()"
+                                style="background: transparent; border: 1px solid var(--accent); width: 100%;">📤
+                                Carregar Dados (Importar)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="margin-bottom: 1rem;">☁️ Conexão Supabase (Opcional)</h3>
+                    <p style="margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Conecte seu banco de dados para
+                        sincronizar automaticamente.</p>
+                    <input type="text" id="supabase-url" placeholder="Supabase URL" class="edit-card-input"
+                        style="height: auto; margin-bottom: 0.5rem; width: 100%;">
+                    <input type="text" id="supabase-key" placeholder="Supabase Key" class="edit-card-input"
+                        style="height: auto; margin-bottom: 1rem; width: 100%;">
+                    <button class="nav-btn active" onclick="saveConnection()" style="width: 100%;">Salvar
+                        Conexão</button>
+                </div>
+            </div>
+        </div>
     </main>
 
     <script src="js/script.js"></script>

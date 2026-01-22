@@ -36,6 +36,10 @@ function initApp() {
     } else {
         console.warn("Supabase library not loaded – running offline");
     }
+
+    // Load config into settings UI if exists
+    if (localStorage.getItem('supabase_url')) document.getElementById('supabase-url').value = localStorage.getItem('supabase_url');
+    if (localStorage.getItem('supabase_key')) document.getElementById('supabase-key').value = localStorage.getItem('supabase_key');
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -191,7 +195,6 @@ function renderLogModalContent(log, isEditing = false) {
         `;
     }
 }
-// expose Helper for "edit mode" toggle button click
 window.renderLogModalContent = renderLogModalContent;
 
 
@@ -454,48 +457,6 @@ function saveCardEdit() {
 }
 window.saveCardEdit = saveCardEdit;
 
-// ---------- Backup ----------
-function exportData() {
-    const data = { logs, cards, exportDate: new Date().toISOString() };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
-    const a = document.createElement('a');
-    a.setAttribute('href', dataStr);
-    a.setAttribute('download', 'meus_estudos_backup.json');
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-}
-window.exportData = exportData;
-
-function importData(input) {
-    if (!confirm('Esta ação substituirá TODOS os dados. Continuar?')) { if (input) input.value = ''; return; }
-    const file = input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (data.logs) {
-                logs = data.logs;
-                fullLogs = [...logs]; // Sync
-                localStorage.setItem('study_logs', JSON.stringify(logs));
-            }
-            if (data.cards) {
-                cards = data.cards;
-                fullCards = [...cards]; // Sync
-                localStorage.setItem('study_cards', JSON.stringify(cards));
-            }
-            renderLogs();
-            renderCardsGrid();
-            calculateStreak();
-            alert('Backup restaurado com sucesso!');
-        } catch (err) { alert('Erro ao ler backup'); console.error(err); }
-    };
-    reader.readAsText(file);
-    input.value = '';
-}
-window.importData = importData;
-
 // ---------- Search & Streak ----------
 function handleSearch(query) {
     const term = query.toLowerCase();
@@ -565,3 +526,67 @@ function updateStreakDisplay(days) {
         el.innerHTML = `🔥 ${days} dia${days !== 1 ? 's' : ''} seguido${days !== 1 ? 's' : ''}!`;
     }
 }
+
+// ---------- Settings / Data ----------
+function openSettingsModal() {
+    document.getElementById('settings-modal').style.display = 'flex';
+}
+window.openSettingsModal = openSettingsModal;
+
+function closeSettingsModal() {
+    document.getElementById('settings-modal').style.display = 'none';
+}
+window.closeSettingsModal = closeSettingsModal;
+
+function saveConnection() {
+    const url = document.getElementById('supabase-url').value;
+    const key = document.getElementById('supabase-key').value;
+    localStorage.setItem('supabase_url', url);
+    localStorage.setItem('supabase_key', key);
+    alert('Conexão salva! Recarregando...');
+    location.reload();
+}
+window.saveConnection = saveConnection;
+
+// Export/Import reusing existing logic
+function exportData() {
+    const data = { logs, cards, exportDate: new Date().toISOString() };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+    const a = document.createElement('a');
+    a.setAttribute('href', dataStr);
+    a.setAttribute('download', 'meus_estudos_backup.json');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+window.exportData = exportData;
+
+function importData(input) {
+    if (!confirm('Esta ação substituirá TODOS os dados atuais. Continuar?')) { if (input) input.value = ''; return; }
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.logs) {
+                logs = data.logs;
+                fullLogs = [...logs];
+                localStorage.setItem('study_logs', JSON.stringify(logs));
+            }
+            if (data.cards) {
+                cards = data.cards;
+                fullCards = [...cards];
+                localStorage.setItem('study_cards', JSON.stringify(cards));
+            }
+            renderLogs();
+            renderCardsGrid();
+            calculateStreak();
+            alert('Backup restaurado com sucesso! Seus dados agora estão neste navegador.');
+            closeSettingsModal();
+        } catch (err) { alert('Erro ao ler backup'); console.error(err); }
+    };
+    reader.readAsText(file);
+    input.value = '';
+}
+window.importData = importData;
