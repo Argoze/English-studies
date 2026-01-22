@@ -52,7 +52,10 @@
             <!-- Journal Modal -->
             <div id="journal-modal" class="modal-overlay" style="display: none;">
                 <div class="modal-content-wrapper">
-                    <button class="close-modal-btn" onclick="closeJournalModal()">×</button>
+                    <div class="modal-header">
+                        <h3 style="margin: 0; font-size: 1rem; color: var(--text-secondary);">Leitura</h3>
+                        <button class="close-modal-btn" onclick="closeJournalModal()">×</button>
+                    </div>
                     <div class="modal-scroll-content">
                         <div id="journal-modal-body">
                             <!-- Content injected here -->
@@ -79,7 +82,10 @@
             <!-- Study Modal -->
             <div id="study-modal" class="modal-overlay" style="display: none;">
                 <div class="modal-content-wrapper">
-                    <button class="close-modal-btn" onclick="closeStudyModal()">×</button>
+                    <div class="modal-header">
+                        <h3 style="margin: 0; font-size: 1rem; color: var(--text-secondary);">Estudar</h3>
+                        <button class="close-modal-btn" onclick="closeStudyModal()">×</button>
+                    </div>
                     <div class="modal-scroll-content">
                         <div class="flashcard-container" onclick="flipCard()">
                             <div class="flashcard" id="active-card">
@@ -116,7 +122,10 @@
         <!-- Settings Modal -->
         <div id="settings-modal" class="modal-overlay" style="display: none;">
             <div class="modal-content-wrapper" style="text-align: left;">
-                <button class="close-modal-btn" onclick="closeSettingsModal()">×</button>
+                <div class="modal-header">
+                    <h3 style="margin: 0; font-size: 1rem; color: var(--text-secondary);">Configurações</h3>
+                    <button class="close-modal-btn" onclick="closeSettingsModal()">×</button>
+                </div>
                 <div class="modal-scroll-content">
                     <h2 style="color: var(--accent); margin-bottom: 1.5rem;">⚙️ Configurações & Dados</h2>
 

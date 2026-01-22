@@ -180,6 +180,15 @@ function closeJournalModal() {
 }
 window.closeJournalModal = closeJournalModal;
 
+// Safe Edit Helper
+function enableLogEdit(id) {
+    const log = logs.find(l => l.id == id);
+    if (log) {
+        renderLogModalContent(log, true);
+    }
+}
+window.enableLogEdit = enableLogEdit;
+
 function renderLogModalContent(log, isEditing = false) {
     const body = document.getElementById('journal-modal-body');
     const parse = (typeof marked !== 'undefined' && marked.parse) ? marked.parse : text => text;
@@ -196,7 +205,7 @@ function renderLogModalContent(log, isEditing = false) {
             </div>
         `;
     } else {
-        // Read View
+        // Read View - using enableLogEdit(id) to avoid inline object parsing issues
         body.innerHTML = `
             <div style="border-bottom:1px solid var(--glass-border); padding-bottom:1rem; margin-bottom:1rem;">
                 <div style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:0.5rem;">${log.date}</div>
@@ -205,7 +214,7 @@ function renderLogModalContent(log, isEditing = false) {
             </div>
             <div class="log-content-body">${parse(log.content)}</div>
             <div style="margin-top:2rem; border-top:1px solid var(--glass-border); padding-top:1rem; display:flex; justify-content:flex-end; gap:1rem;">
-                <button class="edit-btn" onclick="renderLogModalContent({ id: ${log.id}, topic: '${log.topic.replace(/'/g, "\\'")}', tags: '${(log.tags || '').replace(/'/g, "\\'")}', content: \`${log.content.replace(/`/g, "\\`")}\` }, true)">✏️ Editar</button>
+                <button class="edit-btn" onclick="enableLogEdit(${log.id})">✏️ Editar</button>
                 <button class="delete-btn" onclick="deleteLog(${log.id})">🗑️ Apagar</button>
             </div>
             <!-- Added Footer Close Button -->
