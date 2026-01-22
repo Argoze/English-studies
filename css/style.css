@@ -477,8 +477,13 @@ button.action-btn:hover {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .modal-content {
@@ -487,23 +492,44 @@ button.action-btn:hover {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1rem;
+    background: #1e293b;
+    /* Ensure background is opaque for sticky to work over content */
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--glass-border);
 }
 
 .close-modal-btn {
-    position: absolute;
-    top: -3rem;
-    right: 0;
-    background: transparent;
-    border: none;
+    position: sticky;
+    /* Sticky position */
+    top: 0;
+    align-self: flex-end;
+    /* Align to right */
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: white;
-    font-size: 2.5rem;
+    font-size: 1.5rem;
     cursor: pointer;
     line-height: 1;
-    transition: transform 0.2s;
+    transition: all 0.2s;
+    z-index: 50;
+    /* Above content */
+    margin-bottom: -40px;
+    /* Pull content up so it doesnt take extra space if unwanted, or just let it consist */
+    margin-right: -1rem;
+    /* Adjust positioning */
+    margin-top: -1rem;
 }
 
 .close-modal-btn:hover {
-    color: var(--accent);
-    transform: scale(1.1);
+    background: var(--accent);
+    transform: rotate(90deg);
 }

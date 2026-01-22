@@ -40,6 +40,22 @@ function initApp() {
     // Load config into settings UI if exists
     if (localStorage.getItem('supabase_url')) document.getElementById('supabase-url').value = localStorage.getItem('supabase_url');
     if (localStorage.getItem('supabase_key')) document.getElementById('supabase-key').value = localStorage.getItem('supabase_key');
+
+    // Init Modal Click Outside Listeners
+    initModalClosers();
+}
+
+function initModalClosers() {
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                // Determine which modal to close based on ID
+                if (overlay.id === 'journal-modal') closeJournalModal();
+                if (overlay.id === 'study-modal') closeStudyModal();
+                if (overlay.id === 'settings-modal') closeSettingsModal();
+            }
+        });
+    });
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -192,6 +208,8 @@ function renderLogModalContent(log, isEditing = false) {
                 <button class="edit-btn" onclick="renderLogModalContent({ id: ${log.id}, topic: '${log.topic.replace(/'/g, "\\'")}', tags: '${(log.tags || '').replace(/'/g, "\\'")}', content: \`${log.content.replace(/`/g, "\\`")}\` }, true)">✏️ Editar</button>
                 <button class="delete-btn" onclick="deleteLog(${log.id})">🗑️ Apagar</button>
             </div>
+            <!-- Added Footer Close Button -->
+            <button onclick="closeJournalModal()" class="nav-btn" style="width:100%; margin-top:2rem; background:rgba(255,255,255,0.05); border:1px solid var(--glass-border);">Fechar Leitura</button>
         `;
     }
 }
