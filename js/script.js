@@ -29,7 +29,6 @@ function initApp() {
     if (typeof window.supabase !== 'undefined') {
         try {
             supabaseClient = window.supabase.createClient(SB_URL, SB_KEY);
-            console.log("Supabase client created (hard‑coded)");
             loadFromSupabase();
         } catch (e) {
             console.error("Supabase init error", e);
@@ -39,7 +38,6 @@ function initApp() {
     }
 }
 
-// Run init immediately if DOM already loaded, otherwise wait for DOMContentLoaded
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     initApp();
 } else {
@@ -53,7 +51,7 @@ async function loadFromSupabase() {
     const { data: dbLogs, error: logError } = await supabaseClient.from('logs').select('*').order('id', { ascending: false });
     if (!logError && dbLogs) {
         logs = dbLogs;
-        fullLogs = [...logs]; // Sync master list
+        fullLogs = [...logs];
         renderLogs();
         calculateStreak();
         localStorage.setItem('study_logs', JSON.stringify(logs));
@@ -62,7 +60,7 @@ async function loadFromSupabase() {
     const { data: dbCards, error: cardError } = await supabaseClient.from('cards').select('*');
     if (!cardError && dbCards) {
         cards = dbCards;
-        fullCards = [...cards]; // Sync master list
+        fullCards = [...cards];
         renderCardsGrid();
         localStorage.setItem('study_cards', JSON.stringify(cards));
     }
@@ -70,11 +68,9 @@ async function loadFromSupabase() {
 
 // ---------- Navigation ----------
 function switchView(viewId, btnEl) {
-    // Sections
     document.querySelectorAll('.view-section').forEach(sec => {
         sec.classList.toggle('active', sec.id === viewId);
     });
-    // Buttons
     if (btnEl) {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         btnEl.classList.add('active');
@@ -82,15 +78,43 @@ function switchView(viewId, btnEl) {
 }
 window.switchView = switchView;
 
-// ---------- Journal ----------
+// ---------- Journal (Grid & Modal) ----------
+// 1. Render Grid
+function renderLogs() {
+    const grid = document.getElementById('logs-grid');
+    if (!grid) return;
+
+    if (logs.length === 0) {
+        grid.innerHTML = '<p style="text-align:center;width:100%;">Nenhum registro encontrado. Escreva algo hoje!</p>';
+        return;
+    }
+
+    grid.innerHTML = logs.map((log, index) => {
+        // Create a plain text preview (strip simple markdown)
+        const preview = log.content.replace(/[#*`]/g, '').slice(0, 100) + (log.content.length > 100 ? '...' : '');
+        return `
+        <div class="grid-card" onclick="openJournalModal(${log.id})" style="aspect-ratio:auto; min-height:200px; align-items:start; padding:1.5rem; text-align:left;">
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem;">${log.date}</div>
+            <h3 style="color:var(--accent); margin-bottom:0.5rem; font-size:1.2rem;">${log.topic}</h3>
+            ${log.tags ? `<div class="tags-container" style="justify-content:flex-start;">${log.tags.split(',').slice(0, 3).map(t => `<span class="tag-chip" style="font-size:0.6rem;">${t.trim()}</span>`).join('')}</div>` : ''}
+            <p style="font-size:0.9rem; color:var(--text-primary); margin-top:1rem; opacity:0.8; line-height:1.4;">${preview}</p>
+        </div>`;
+    }).join('');
+}
+window.renderLogs = renderLogs;
+
+// 2. Add Log
 function addLog() {
     const topicEl = document.getElementById('log-topic');
     const contentEl = document.getElementById('log-content');
-    if (!topicEl || !contentEl) return alert('Campos de log não encontrados');
+    if (!topicEl || !contentEl) return;
+
     const topic = topicEl.value.trim();
     const tagsVal = document.getElementById('log-tags')?.value.trim() || '';
     const content = contentEl.value.trim();
+
     if (!topic || !content) return alert('Preencha tópico e conteúdo');
+
     const entry = {
         id: Date.now(),
         date: new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
@@ -100,16 +124,20 @@ function addLog() {
     };
     logs.unshift(entry);
     fullLogs.unshift(entry);
+
     renderLogs();
     calculateStreak();
+
     if (supabaseClient) {
         supabaseClient.from('logs').insert([entry]).then(({ error }) => {
             if (error) console.error('Supabase insert error', error);
         });
     }
     saveLogs();
+
     topicEl.value = '';
     contentEl.value = '';
+    document.getElementById('log-tags').value = '';
 }
 window.addLog = addLog;
 
@@ -117,53 +145,110 @@ function saveLogs() {
     localStorage.setItem('study_logs', JSON.stringify(logs));
 }
 
+// 3. Journal Modal Logic
+function openJournalModal(id) {
+    const log = logs.find(l => l.id == id);
+    if (!log) return;
+
+    renderLogModalContent(log);
+    document.getElementById('journal-modal').style.display = 'flex';
+}
+window.openJournalModal = openJournalModal;
+
+function closeJournalModal() {
+    document.getElementById('journal-modal').style.display = 'none';
+}
+window.closeJournalModal = closeJournalModal;
+
+function renderLogModalContent(log, isEditing = false) {
+    const body = document.getElementById('journal-modal-body');
+    const parse = (typeof marked !== 'undefined' && marked.parse) ? marked.parse : text => text;
+
+    if (isEditing) {
+        // Edit Form
+        body.innerHTML = `
+            <input type="text" id="edit-topic" value="${log.topic}" class="edit-card-input" style="height:auto; margin-bottom:1rem; font-size:1.5rem; font-weight:bold; width:100%;">
+            <input type="text" id="edit-tags" value="${log.tags || ''}" placeholder="Tags (ex: react, grammar)" class="edit-card-input" style="height:auto; margin-bottom:1rem; font-size:1rem; width:100%;">
+            <textarea id="edit-content" class="edit-card-input" rows="10" style="font-size:1rem; line-height:1.6; width:100%;">${log.content}</textarea>
+            <div style="margin-top:1rem; text-align:right;">
+                <button class="nav-btn" onclick="openJournalModal(${log.id})">Cancelar</button>
+                <button class="nav-btn active" onclick="saveLogEdit(${log.id})">Salvar</button>
+            </div>
+        `;
+    } else {
+        // Read View
+        body.innerHTML = `
+            <div style="border-bottom:1px solid var(--glass-border); padding-bottom:1rem; margin-bottom:1rem;">
+                <div style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:0.5rem;">${log.date}</div>
+                <h2 style="color:var(--accent); margin-bottom:0.5rem;">${log.topic}</h2>
+                ${log.tags ? `<div class="tags-container">${log.tags.split(',').map(t => `<span class="tag-chip">${t.trim()}</span>`).join('')}</div>` : ''}
+            </div>
+            <div class="log-content-body">${parse(log.content)}</div>
+            <div style="margin-top:2rem; border-top:1px solid var(--glass-border); padding-top:1rem; display:flex; justify-content:flex-end; gap:1rem;">
+                <button class="edit-btn" onclick="renderLogModalContent({ id: ${log.id}, topic: '${log.topic.replace(/'/g, "\\'")}', tags: '${(log.tags || '').replace(/'/g, "\\'")}', content: \`${log.content.replace(/`/g, "\\`")}\` }, true)">✏️ Editar</button>
+                <button class="delete-btn" onclick="deleteLog(${log.id})">🗑️ Apagar</button>
+            </div>
+        `;
+    }
+}
+// expose Helper for "edit mode" toggle button click
+window.renderLogModalContent = renderLogModalContent;
+
+
+function saveLogEdit(id) {
+    const topicVal = document.getElementById('edit-topic').value.trim();
+    const tagsVal = document.getElementById('edit-tags').value.trim();
+    const contentVal = document.getElementById('edit-content').value.trim();
+
+    if (!topicVal || !contentVal) return alert('Tópico e Conteúdo são obrigatórios');
+
+    const logIndex = logs.findIndex(l => l.id == id);
+    if (logIndex !== -1) {
+        logs[logIndex].topic = topicVal;
+        logs[logIndex].tags = tagsVal;
+        logs[logIndex].content = contentVal;
+
+        // Sync full
+        const fIdx = fullLogs.findIndex(l => l.id == id);
+        if (fIdx !== -1) fullLogs[fIdx] = logs[logIndex];
+    }
+
+    saveLogs(); // Local
+
+    if (supabaseClient) {
+        supabaseClient.from('logs').update({
+            topic: topicVal,
+            tags: tagsVal,
+            content: contentVal
+        }).eq('id', id).then(({ error }) => {
+            if (error) console.error('Supabase log update error', error);
+        });
+    }
+
+    renderLogs(); // Update Grid
+    openJournalModal(id); // Re-render modal in read mode
+}
+window.saveLogEdit = saveLogEdit;
+
 function deleteLog(id) {
     if (!confirm('Apagar este registro?')) return;
+
     logs = logs.filter(l => l.id != id);
+    fullLogs = fullLogs.filter(l => l.id != id);
+
     renderLogs();
+    saveLogs();
+
     if (supabaseClient) {
         supabaseClient.from('logs').delete().eq('id', id).then(({ error }) => {
             if (error) console.error('Supabase delete error', error);
         });
     }
-    saveLogs();
+
+    closeJournalModal();
 }
 window.deleteLog = deleteLog;
 
-function renderLogs() {
-    const container = document.getElementById('entries-list');
-    if (!container) return;
-    const parse = (typeof marked !== 'undefined' && marked.parse) ? marked.parse : text => text;
-    container.innerHTML = logs.map(log => {
-        if (editingLogId && log.id == editingLogId) {
-            return `
-            <div class="log-entry editing-entry">
-                <input type="text" id="edit-topic-${log.id}" value="${log.topic}" placeholder="Tópico" class="edit-card-input" style="height:auto;margin-bottom:0.5rem;font-size:1.1rem;font-weight:bold;">
-                <input type="text" id="edit-tags-${log.id}" value="${log.tags || ''}" placeholder="Tags (ex: react, grammar)" class="edit-card-input" style="height:auto;margin-bottom:0.5rem;font-size:0.9rem;">
-                <textarea id="edit-content-${log.id}" class="edit-card-input" rows="4" style="font-size:1rem;line-height:1.5;">${log.content}</textarea>
-                <div style="margin-top:0.5rem;text-align:right;">
-                    <button class="nav-btn" onclick="cancelLogEdit()" style="background:transparent;border:1px solid #fff;">Cancelar</button>
-                    <button class="nav-btn active" onclick="saveLogEdit(${log.id})">Salvar</button>
-                </div>
-            </div>`;
-        }
-        return `
-    <div class="log-entry">
-      <div class="entry-header" style="display:flex;justify-content:space-between;align-items:start;">
-        <div>
-          <div class="log-date">${log.date}</div>
-          <h3 style="color:var(--accent);margin-bottom:0.5rem;">${log.topic}</h3>
-          ${log.tags ? `<div class="tags-container">${log.tags.split(',').map(t => `<span class="tag-chip">${t.trim()}</span>`).join('')}</div>` : ''}
-        </div>
-        <div class="action-buttons">
-            <button class="edit-btn" onclick="editLog(${log.id})" title="Editar">✏️</button>
-            <button class="delete-btn" onclick="deleteLog(${log.id})" title="Apagar">🗑️</button>
-        </div>
-      </div>
-      <div class="log-content-body">${parse(log.content)}</div>
-    </div>`;
-    }).join('');
-}
 
 // ---------- Flashcards (Grid & Modal) ----------
 
@@ -368,58 +453,6 @@ function saveCardEdit() {
     btn.title = 'Editar Cartão';
 }
 window.saveCardEdit = saveCardEdit;
-
-// ---------- Log Editing ----------
-let editingLogId = null;
-
-function editLog(id) {
-    if (editingLogId) return alert('Finalize a edição atual primeiro!');
-    const log = logs.find(l => l.id == id);
-    if (!log) return;
-    editingLogId = id;
-    renderLogs();
-}
-window.editLog = editLog;
-
-function cancelLogEdit() {
-    editingLogId = null;
-    renderLogs();
-}
-window.cancelLogEdit = cancelLogEdit;
-
-function saveLogEdit(id) {
-    const topicVal = document.getElementById(`edit-topic-${id}`).value.trim();
-    const tagsVal = document.getElementById(`edit-tags-${id}`).value.trim();
-    const contentVal = document.getElementById(`edit-content-${id}`).value.trim();
-
-    if (!topicVal || !contentVal) return alert('Tópico e Conteúdo são obrigatórios');
-
-    const logIndex = logs.findIndex(l => l.id == id);
-    if (logIndex === -1) return;
-
-    logs[logIndex].topic = topicVal;
-    logs[logIndex].tags = tagsVal;
-    logs[logIndex].content = contentVal;
-
-    const fullIndex = fullLogs.findIndex(l => l.id == id);
-    if (fullIndex !== -1) fullLogs[fullIndex] = logs[logIndex];
-
-    localStorage.setItem('study_logs', JSON.stringify(logs));
-
-    if (supabaseClient) {
-        supabaseClient.from('logs').update({
-            topic: topicVal,
-            tags: tagsVal,
-            content: contentVal
-        }).eq('id', id).then(({ error }) => {
-            if (error) console.error('Supabase log update error', error);
-        });
-    }
-
-    editingLogId = null;
-    renderLogs();
-}
-window.saveLogEdit = saveLogEdit;
 
 // ---------- Backup ----------
 function exportData() {
